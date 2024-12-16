@@ -1,0 +1,23 @@
+{
+  "name": "atoms",
+  "version": "1.0.0",
+  "description": "Atoms library very similar to Jotai, implemented as an exercise to learn and see where I could go with my own code. It was good fun but I don't feel like pursuing this effort any longer.",
+  "type": "module",
+  "main": "atoms.mjs",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "devDependencies": {
+    "jotai": "^2.10.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/glromeo/atoms.git"
+  },
+  "author": "Gianluca Romeo <glromeo@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/glromeo/atoms/issues"
+  },
+  "homepage": "https://github.com/glromeo/atoms#readme"
+}
