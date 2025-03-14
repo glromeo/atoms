@@ -3,20 +3,12 @@
 I fell in love with Atoms (aka Signals) since I first saw [this video](https://youtu.be/_ISAA_Jt9kI)
 on [Recoil](https://recoiljs.org/)
 and I have been using them since the beginning of 2023.
-My library of choice was [Jotai](https://jotai.org/) because of the beautiful API...and when like me, you like your
-coding, the enjoyment is using an API is second only to the need for speed!
-Not that Jotai is perfect but it gets pretty close. I have used
-also [Preact signals](https://preactjs.com/guide/v10/signals/)
-but I find it less pleasant to envision scopes with it since the signal (and effect) definition is pretty much bound
-to the module you import.
-Jotai is building rapidly an ecosystem of utility modules around it which I don't personally like because most of them
-are just a little bit of syntactic sugar which hardly works for every situation.
-On top of it the implementation of the vanilla library has some room for performance improvement and the react hooks
-are way too cumbersome (to get decent peformance I had to implement myself ones based
-on [useSyncExternalStore](https://react.dev/reference/react/useSyncExternalStore)
-folloing the example of Preact signals ...big thank you there!).
-With the experience I got in using them I decided to take a stab at rolling out my own version of Jotai like atoms
-and now that my implementation is complete here is how it performs.
+My library of choice was [Jotai](https://jotai.org/) because of the straightforward API in the vanilla library but I think there is 
+some room for improvement in the react hooks like using [useSyncExternalStore](https://react.dev/reference/react/useSyncExternalStore)
+With the experience I got in using Jotai I decided to take a stab at rolling out my own version of atoms
+and once I got to a decent level of completeness I compared how it performs.
+
+### Roughly I got these performances
 
 |              | Jotai    | mine     |
 |--------------|----------|----------|
@@ -26,7 +18,7 @@ and now that my implementation is complete here is how it performs.
 | heapUsed     | 252M     | 365M     |
 | external     | 1.79M    | 1.79M    |
 
-**mine** is roughly **10** times faster, using **1/4** of the memory
+my PoC is about **10** times faster, using **1/4** of the memory
 
 > The benchmark creates a binary tree 16 level deep (64k nodes) where the leaves are primitive and for 100k times
 > changes the other 3rd of these to trigger an update of the subscriber that looking at the root node
@@ -35,7 +27,7 @@ I do believe the runtime around the atoms won't be the major bottleneck but I st
 solution rather than leaning on the more established version also because I want to be able to tweak its internals
 as I see it fit
 
-## What are atoms?
+## What are atoms? In case you didn't know...
 
 **Atoms** are values stored in a **WeakMap** which I like to call a **molecule**. An atom can be primitive or derived.
 A primitive atom refers to a value while a derived atom refers to a computation but atoms don't actually store
