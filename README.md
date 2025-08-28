@@ -1,89 +1,152 @@
 # Atoms
 
-I fell in love with Atoms (aka Signals) since I first saw [this video](https://youtu.be/_ISAA_Jt9kI)
-on [Recoil](https://recoiljs.org/)
-and I have been using them since the beginning of 2023.
-My library of choice was [Jotai](https://jotai.org/) because of the straightforward API in the vanilla library but I think there is 
-some room for improvement in the react hooks like using [useSyncExternalStore](https://react.dev/reference/react/useSyncExternalStore)
-With the experience I got in using Jotai I decided to take a stab at rolling out my own version of atoms
-and once I got to a decent level of completeness I compared how it performs.
+I fell in love with **Atoms** (aka **Signals**) since I first saw [this video](https://youtu.be/_ISAA_Jt9kI)  
+on [Recoil](https://recoiljs.org/), and I’ve been using them regularly since early 2023.
 
-### Roughly I got these performances
+My library of choice was [Jotai](https://jotai.org/), thanks to its straightforward vanilla API.  
+Still, I found some room for improvement—particularly in the React hooks layer, such as adopting [useSyncExternalStore](https://react.dev/reference/react/useSyncExternalStore).
 
-|              | Jotai    | mine     |
+With the experience I gained using Jotai, I decided to roll out my own implementation of Atoms. Once it reached a decent level of completeness, I compared its performance.
+
+---
+
+## Benchmarks
+
+|              | Jotai    | Mine     |
 |--------------|----------|----------|
-| **duration** | 6.678sec | 0.698sec |
-| rss          | 841M     | 429M     |
-| heapTotal    | 496M     | 396M     |
-| heapUsed     | 252M     | 365M     |
-| external     | 1.79M    | 1.79M    |
+| **duration** | 6.678 s  | 0.698 s  |
+| **rss**      | 841 MB   | 429 MB   |
+| **heapTotal**| 496 MB   | 396 MB   |
+| **heapUsed** | 252 MB   | 365 MB   |
+| **external** | 1.79 MB  | 1.79 MB  |
 
-my PoC is about **10** times faster, using **1/4** of the memory
+My PoC is roughly **10× faster**, using about **½ the memory**.
 
-> The benchmark creates a binary tree 16 level deep (64k nodes) where the leaves are primitive and for 100k times
-> changes the other 3rd of these to trigger an update of the subscriber that looking at the root node
+> The benchmark builds a binary tree 16 levels deep (~64k nodes).  
+> Leaf nodes are primitive atoms. For 100k iterations, one third of the leaves are updated,  
+> triggering recomputation up to the subscribed root node.
 
-I do believe the runtime around the atoms won't be the major bottleneck but I still see value in betting on my own
-solution rather than leaning on the more established version also because I want to be able to tweak its internals
-as I see it fit
+I don’t believe the runtime around Atoms is usually the bottleneck in applications.  
+But I still see value in betting on my own solution—both to squeeze more performance  
+and to have full control over the internals when I want to tweak them.
 
-## What are atoms? In case you didn't know...
+---
 
-**Atoms** are values stored in a **WeakMap** which I like to call a **molecule**. An atom can be primitive or derived.
-A primitive atom refers to a value while a derived atom refers to a computation but atoms don't actually store
-values or results, they are purely keys in a map, they make sense within a molecule.
-You can think of the molecule as a scope, a context in which certain variables (the atoms) have certain values
-and these values change over time according to rules defined by derived atoms and the values that are directly
-set on the primitive atoms.
+## What are Atoms?
 
-```javascript 
-const p = atom(5) // is an example of primitive
+An **Atom** is just a key (an object) that represents a piece of state.  
+Atoms don’t store values directly; instead, they are looked up in a **molecule**,  
+which is just a [WeakMap](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/WeakMap) managed by a `Scope`.
+
+- **Primitive Atoms** hold raw values.
+- **Derived Atoms** compute values from other atoms.
+- All values are cached in the molecule until invalidated.
+
+### Primitive atoms
+
+```js
+const { get, set } = new Scope()
+const count = atom(9)
+
+console.log(get(count))  // → 9
+set(count, 5)
+console.log(get(count))  // → 5
 ```
 
-**p** is an object that's used as a key to look up the value of the atom in a molecule
+### Derived atoms
 
-```javascript
-const {get, set} = new Scope()
-const p = atom(9)
+```js
+const num = atom(5)
+const doubled = atom(get => get(num) * 2)
 
-console.log(get(p))  // prints 9 
-set(p, 5)
-console.log(get(p))  // prints 5
+console.log(get(doubled))  // → 10
 ```
 
-A derived atom allows to perform computations and the intermediate values of these computations
-are cached in the WeakMap so unless there is an actual change being propagated the function
-that defines a derived atom value is not invoked
+The function of a derived atom is only re-executed when its dependencies change.
 
-```javascript
-const d = atom(get => get(num) * 2)
-console.log(scope.get(d))  // prints 10 
-```
+### Multiple scopes
 
-To define multiple scopes is as easy as creating as many molecules as needed
+Atoms are keys; their values are scoped.  
+You can create as many independent scopes (molecules) as you need:
 
-```javascript
+```js
 const scope1 = new Scope()
 const scope2 = new Scope()
-const num = atom(9)
+const value = atom(9)
 
-scope1.set(num, 5)
-scope2.set(num, 10)
+scope1.set(value, 5)
+scope2.set(value, 10)
 
-console.log(scope1.get(num))  // prints 5 
-console.log(scope2.get(num))  // prints 10
+console.log(scope1.get(value))  // → 5
+console.log(scope2.get(value))  // → 10
 ```
 
-Atoms can be observed for change in the scope the listener is bound to,
-changes to the same atom in another scope won't be notified to that listener
+### Subscribing to changes
 
-```javascript
-scope1.bind(num, () => console.log('num has changed in scope 1'))
-scope2.bind(num, () => console.log('num has changed in scope 2'))
+You can observe atom changes in a given scope:
 
-scope1.set(num, 42) // prints 'num has changed in scope 1' and nothing else
+```js
+scope1.bind(value, () => console.log('value changed in scope1'))
+scope2.bind(value, () => console.log('value changed in scope2'))
+
+scope1.set(value, 42)
+// → "value changed in scope1"
 ```
 
-with **bind**, differently from Jotai's **sub** the links between the listener and the atoms are kept withing
-a set of bindings in the molecule.
-There are the `unbind` and `dispose` functions available on every molecule. 
+Listeners are local to the scope in which they are bound.  
+Changing the same atom in another scope does not trigger them.
+
+### Async atoms
+
+Derived atoms can return a promise, making async state straightforward:
+
+```js
+const user = atom(async get => {
+  const res = await fetch('/api/user')
+  return res.json()
+})
+
+scope.get(user).then(data => {
+  console.log('loaded user', data)
+})
+```
+
+The promise is cached until resolved; listeners are called when the final value is available.
+
+---
+
+## API Overview
+
+- **`atom(init | read, write?)`**  
+  Create a primitive or derived atom.
+
+- **`new Scope()`**  
+  Creates a molecule (container for atom states).  
+  Provides:
+    - `get(atom)` → value | Promise
+    - `set(atom, value | ...args)`
+    - `bind(atom, callback)` → unsubscribe function
+    - `unbind(atom?, callback?)`
+    - `dismiss()` → remove all bindings
+
+- **Events**  
+  Atoms can define lifecycle hooks with `on('bind', handler)`  
+  where `handler(scope)` may return a cleanup function.
+
+---
+
+## Why another atom library?
+
+- Faster runtime (see benchmarks).
+- Simpler internal model for experimenting.
+- Full control over lifecycle hooks and bindings.
+- Works outside React by design—can be used in any JS app.
+
+---
+
+## Status
+
+This is still an **experimental** project, but already functional.  
+Expect the API to evolve as I refine features and ergonomics.
+
+Contributions, ideas, and benchmarks are welcome! 🚀

@@ -3,6 +3,7 @@ function remove(state, observer) {
         state.observers = null;
         if (state.dependencies) {
             for (const dependency of state.dependencies) remove(dependency, state);
+            state.dependencies = null;
         }
     }
 }
@@ -52,30 +53,36 @@ export class Scope extends WeakMap {
                 return value;
             };
             state.stale = true;
+            state.pending = null;
             state.refresh = () => {
-                const {value, dependencies, listeners} = state;
+                if (state.pending) return state.pending; // coalesce
+
+                const {value: prev, dependencies, listeners} = state;
                 state.dependencies = new Set();
-                state.value = atom.read(getter);
+                const next = atom.read(getter);
+
                 const finalize = () => {
-                    for (const dependency of dependencies) {
-                        if (!state.dependencies.has(dependency)) {
-                            remove(dependency, state);
-                        }
-                    }
+                    for (const dep of dependencies) if (!state.dependencies.has(dep)) remove(dep, state);
                     state.stale = false;
-                    if (listeners && !Object.is(value, state.value)) {
-                        for (const listener of listeners) {
-                            listener(state.value);
-                        }
+                    state.pending = null;
+                    if (listeners && !Object.is(prev, state.value)) {
+                        for (const l of listeners) l(state.value);
                     }
                     return state.value;
                 };
-                if (state.value?.then) {
-                    return state.value.then(resolved => {
+
+                if (next?.then) {
+                    state.pending = next.then(resolved => {
                         state.value = resolved;
                         return finalize();
+                    }, err => {
+                        state.pending = null; // allow retry on next get()
+                        state.stale = false;  // avoid permanent stale
+                        throw err;
                     });
+                    return state.pending;
                 } else {
+                    state.value = next;
                     return finalize();
                 }
             };
